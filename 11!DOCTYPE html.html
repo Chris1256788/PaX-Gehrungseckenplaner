@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gehrungseckenplaner – Restverbreiterung</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background-color: #f7f9fc;
+      color: #333;
+    }
+
+    .konfigurator {
+      max-width: 960px;
+      margin: auto;
+      background: #fff;
+      padding: 32px;
+      border-radius: 10px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      font-size: 1.8em;
+      margin-bottom: 1em;
+      color: #2c3e50;
+    }
+
+    .option {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1em;
+      background-color: #fefefe;
+      transition: border 0.2s ease;
+    }
+
+    select:focus {
+      border-color: #3498db;
+      outline: none;
+    }
+
+    .ergebnis {
+      margin-top: 32px;
+      padding: 24px;
+      background: #fdfdfd;
+      border: 2px solid #555;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .konfig-liste {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .konfig-liste li {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .konfig-liste li:last-child {
+      border-bottom: none;
+    }
+
+    .label {
+      font-weight: 600;
+      color: #555;
+      flex-basis: 60%;
+    }
+
+    .highlight {
+      font-weight: bold;
+      color: #333;
+    }
+
+    .card-title {
+      margin-top: 1.5em;
+      margin-bottom: 0.5em;
+      font-size: 1.2em;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 4px;
+      color: #2c3e50;
+    }
+
+    small.label {
+      font-weight: normal;
+      color: #888;
+      font-size: 0.9em;
+      margin-top: 4px;
+      display: inline-block;
+    }
+
+    @media (max-width: 600px) {
+      .konfig-liste li {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .label {
+        flex-basis: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="konfigurator">
+    <h1>Gehrungseckenplaner</h1>
+
+    <div class="option">
+      <label for="ecke">Ecke auswählen:</label>
+      <select id="ecke">
+        <option value="">-- bitte auswählen --</option>
+        <option value="90_aussen">90 ° Außenecke</option>
+        <option value="90_innen">90 ° Innenecke</option>
+      </select>
+    </div>
+
+    <div class="option">
+      <label for="beschattung">Beschattung auswählen:</label>
+      <select id="beschattung" disabled><option>-- erst Ecke wählen --</option></select>
+    </div>
+
+    <div class="option">
+      <label for="kastengroesse">Kastengröße auswählen:</label>
+      <select id="kastengroesse" disabled><option>-- erst Beschattung wählen --</option></select>
+    </div>
+
+    <div class="option">
+      <label for="schiene">Führungsschiene auswählen:</label>
+      <select id="schiene" disabled><option>-- erst Kastengröße wählen --</option></select>
+    </div>
+
+    <div class="option">
+      <label for="eckkopplung">Eckkopplung auswählen:</label>
+      <select id="eckkopplung">
+        <option value="">-- bitte auswählen --</option>
+        <option value="82,5">82,5 mm</option>
+        <option value="0">leer (0 mm)</option>
+      </select>
+    </div>
+
+    <div id="ergebnis" class="ergebnis" hidden></div>
+  </div>
+
+ <script>
+const eckeZuBeschattung = {
+  "90_aussen": ["Puka2", "Puka2 Klinker"],
+  "90_innen": ["Test"]
+};
+const beschattungZuKasten = {
+  "Puka2": ["220x240 mm", "250x240 mm", "250x300 mm", "250x365 mm", "250x425 mm", "280x300 mm", "280x365 mm", "280x425 mm"],
+  "Puka2 Klinker": ["245 × 300 mm"]
+};
+const kastenZuSchiene = {
+  "220x240 mm": ["58x37 mm"],
+  "250x240 mm": ["58x37 mm", "58x52 mm"],
+  "250x300 mm": ["58x37 mm", "58x52 mm"],
+  "250x365 mm": ["58x37 mm", "58x52 mm"],
+  "250x425 mm": ["58x37 mm", "58x52 mm"],
+  "280x300 mm": ["58x37 mm", "58x52 mm"],
+  "280x365 mm": ["58x37 mm", "58x52 mm"],
+  "280x425 mm": ["58x37 mm", "58x52 mm"]
+};
+const kombiZuAnforderung = {
+  "220x240 mm|58x37 mm": "Mindestanforderung 1",
+  "250x240 mm|58x37 mm": "Mindestanforderung 2",
+  "250x240 mm|58x52 mm": "Mindestanforderung 3",
+  "250x300 mm|58x37 mm": "Mindestanforderung 4",
+  "250x300 mm|58x52 mm": "Mindestanforderung 5",
+  "250x365 mm|58x37 mm": "Mindestanforderung 6",
+  "250x365 mm|58x52 mm": "Mindestanforderung 7",
+  "250x425 mm|58x37 mm": "Mindestanforderung 8",
+  "250x425 mm|58x52 mm": "Mindestanforderung 9"
+};
+const anforderungDetails = {
+  "Mindestanforderung 1": { ueber: 255, verbr: 192 },
+  "Mindestanforderung 2": { ueber: 255, verbr: 212 },
+  "Mindestanforderung 3": { ueber: 255, verbr: 197 },
+  "Mindestanforderung 4": { ueber: 315, verbr: 252 },
+  "Mindestanforderung 5": { ueber: 315, verbr: 237 },
+  "Mindestanforderung 6": { ueber: 380, verbr: 317 },
+  "Mindestanforderung 7": { ueber: 380, verbr: 302 },
+  "Mindestanforderung 8": { ueber: 380, verbr: 317 },
+  "Mindestanforderung 9": { ueber: 380, verbr: 302 }
+};
+const fillerSizes = [20, 36, 58, 125];
+const maxPieces = 6;
+function bestFillers(rest) {
+  let best = null;
+  function dfs(idx, pieces, sum) {
+    if (sum >= rest) {
+      const diff = sum - rest;
+      if (!best || diff < best.diff || (diff === best.diff && pieces.length < best.combo.length)) {
+        best = { combo: [...pieces], sum, diff };
+      }
+      return; // keine kleineren Kombinationen mehr prüfen
+    }
+    if (pieces.length === maxPieces) return;
+    for (let i = idx; i < fillerSizes.length; i++) {
+      dfs(i, [...pieces, fillerSizes[i]], sum + fillerSizes[i]);
+    }
+  }
+  dfs(0, [], 0);
+  return best;
+}
+const selEcke = document.getElementById('ecke');
+const selBeschattung = document.getElementById('beschattung');
+const selKasten = document.getElementById('kastengroesse');
+const selSchiene = document.getElementById('schiene');
+const selEckkopplung = document.getElementById('eckkopplung');
+const boxErgebnis = document.getElementById('ergebnis');
+
+selEcke.addEventListener('change', () => {
+  resetDownstream(selBeschattung);
+  if (eckeZuBeschattung[selEcke.value]) {
+    fillSelect(selBeschattung, eckeZuBeschattung[selEcke.value]);
+  }
+});
+selBeschattung.addEventListener('change', () => {
+  resetDownstream(selKasten);
+  if (beschattungZuKasten[selBeschattung.value]) {
+    fillSelect(selKasten, beschattungZuKasten[selBeschattung.value]);
+  }
+});
+selKasten.addEventListener('change', () => {
+  resetDownstream(selSchiene);
+  if (kastenZuSchiene[selKasten.value]) {
+    fillSelect(selSchiene, kastenZuSchiene[selKasten.value]);
+  }
+});
+function resetDownstream(sel) {
+  [selBeschattung, selKasten, selSchiene].forEach(s => {
+    if (s === sel || s.compareDocumentPosition(sel) & Node.DOCUMENT_POSITION_PRECEDING) {
+      s.innerHTML = '<option>-- bitte auswählen --</option>';
+      s.disabled = true;
+    }
+  });
+  boxErgebnis.hidden = true;
+}
+function fillSelect(sel, arr) {
+  sel.disabled = false;
+  sel.innerHTML = '<option value="">-- bitte auswählen --</option>';
+  arr.forEach(v => sel.add(new Option(v, v)));
+}
+[selSchiene, selEckkopplung].forEach(el => el.addEventListener('change', zeigeErgebnis));
+
+function zeigeErgebnis() {
+  if (!selSchiene.value || !selEckkopplung.value) {
+    boxErgebnis.hidden = true;
+    return;
+  }
+
+  const key = `${selKasten.value}|${selSchiene.value}`;
+  const anforderung = kombiZuAnforderung[key] || '–';
+  const details = anforderungDetails[anforderung];
+  const eckVal = parseFloat(selEckkopplung.value.replace(',', '.')) || 0;
+
+  let restTxt = '–', fillerTxt = '–', best = null, bestSumTxt = '–';
+  if (details) {
+    const rest = Math.max(0, details.verbr - eckVal);
+    best = bestFillers(rest);
+    restTxt = rest.toFixed(1).replace('.0', '');
+    if (best) {
+      const comboStr = best.combo.length ? best.combo.join(' + ') + ' = ' + best.sum + ' mm' : 'keine';
+      fillerTxt = `${comboStr} (Diff ${best.diff.toFixed(1).replace('.0', '')} mm)`;
+      bestSumTxt = best.sum;
+    }
+  }
+
+  boxErgebnis.innerHTML = `
+       <div class="card">
+      <h3 class="card-title">🧩 Konfiguration</h3>
+      <ul class="konfig-liste">
+        <li><span class="label">Ecke</span><span>${selEcke.options[selEcke.selectedIndex].text}</span></li>
+        <li><span class="label">Beschattung</span><span>${selBeschattung.value}</span></li>
+        <li><span class="label">Kastengröße</span><span>${selKasten.value}</span></li>
+        <li><span class="label">Führungsschiene</span><span>${selSchiene.value}</span></li>
+        <li><span class="label">Eckkopplung</span><span>${selEckkopplung.options[selEckkopplung.selectedIndex].text}</span></li>
+      </ul>
+        
+       <div class="card">
+      <h3 class="card-title">📏 Mindestanforderungen:</h3>
+      <ul class="konfig-liste">
+        <li><span class="label">Verbreiterung (X1 Maß)</span><span>${details ? details.verbr : '–'} mm</span></li>
+        <li><span class="label">Kastenüberstand (X2 Maß)</span><span>${details ? details.ueber : '–'} mm</span></li>
+      </ul>
+      
+       <div class="card">
+      <h3 class="card-title">🔧 Verbreiterungen:</h3>
+      <ul class="konfig-liste">
+        <li><span class="label">Notwendige Verbreiterung nach Abzug Eckkopplung</span><span>${restTxt}&nbsp;mm</span></li>
+        <li><span class="label">Empfohlene Auswahl</span><span>${fillerTxt}</span></li>
+        <li><small class="label">(Auswahl Verbreiterungen ${fillerSizes.join(' / ')} mm)</small></li>
+      </ul>
+
+       <div class="card">
+      <h3 class="card-title">✅ Ergebnis:</h3>
+      <ul class="konfig-liste">
+        <li><span class="label">Empfohlene Verbreiterung (X1 Maß)</span><span>${bestSumTxt}&nbsp;mm</span></li>
+        <li><span class="label">Kastenüberstand (X2 Maß)</span><span>${details && best ? (details.ueber + best.sum - (details.verbr - eckVal)).toFixed(1).replace('.0', '') + ' mm' : '–'}</span></li>
+        <li><span class="label">Gewählte Eckkopplung</span><span>${selEckkopplung.options[selEckkopplung.selectedIndex].text}</span></li>
+      </ul>             
+         
+      <div class="zeichnung" style="margin-top:20px; text-align:center;">
+      <img src="https://i.postimg.cc/wtvGSXZZ/zeichnung.png"alt="Gehrungsecken Zeichnung"style="max-width:100%; height:auto; border:1px solid #ccc; border-radius:8px;">
+</div>
+  `;
+  boxErgebnis.hidden = false;
+}
+</script>
+</body>
+</html>
